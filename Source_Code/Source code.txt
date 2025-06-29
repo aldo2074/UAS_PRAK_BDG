@@ -1,0 +1,39 @@
+1). Load data csv untuk buat node dan atribut
+
+LOAD CSV WITH HEADERS FROM 'file:///wilayah.csv' AS row
+MERGE (w:Wilayah {nama: row.nama_wilayah})
+
+LOAD CSV WITH HEADERS FROM 'file:///partai.csv' AS row
+MERGE (p:Partai {nama: row.nama_partai})
+
+LOAD CSV WITH HEADERS FROM 'file:///jabatan.csv' AS row
+MERGE (j:Jabatan {nama: row.nama_jabatan})
+
+LOAD CSV WITH HEADERS FROM 'file:///universitas.csv' AS row
+MERGE (u:Universitas {nama: row.nama_universitas})
+
+LOAD CSV WITH HEADERS FROM 'file:///tokoh_politik.csv' AS row
+MERGE (t:Tokoh {
+    id: row.id_tokoh,
+    nama: row.nama,
+    negara: row.negara,
+    tahun_lahir: toInteger(row.tahun_lahir),
+    mulai_menjabat: date(row.mulai_menjabat),
+    catatan_karier: row.catatan_karier
+})
+
+2). buat relasi
+
+LOAD CSV WITH HEADERS FROM 'file:///dataset_tokoh_politik.csv' AS row
+MATCH (t:Tokoh {id: row.id_tokoh})
+MATCH (p:Partai {nama: row.partai})
+MATCH (j:Jabatan {nama: row.jabatan})
+MATCH (w:Wilayah {nama: row.wilayah})
+
+MATCH (u:Universitas)
+WHERE toLower(replace(row.pendidikan, "Lulusan", "")) CONTAINS toLower(u.nama)
+
+MERGE (t)-[:ANGGOTA_PARTAI]->(p)
+MERGE (t)-[:MENJABAT_SEBAGAI]->(j)
+MERGE (t)-[:BERKUASA_DI]->(w)
+MERGE (t)-[:ALUMNI]->(u)

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Tokoh Politik</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/popoto/dist/popoto.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .search-container {
+            max-width: 400px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 50px 12px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            background: #f8f9fa;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .search-btn {
+            position: absolute;
+            right: 5px;
+            top: 5px;
+            width: 40px;
+            height: 40px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .autocomplete {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .autocomplete-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .autocomplete-item:hover { background: #f8f9fa; }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .graph-area {
+            flex: 2;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            min-height: 500px;
+        }
+
+        .info-panel {
+            flex: 1;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .info-card {
+            background: linear-gradient(135deg, #fef9e7, #fef3e2);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #f39c12;
+        }
+
+        .name { 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            color: #2c3e50; 
+            margin-bottom: 8px; 
+        }
+
+        .attr {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .relation {
+            background: #f8f9fa;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            border-left: 3px solid #9b59b6;
+            font-size: 14px;
+        }
+
+        .relation:hover { background: #e9ecef; }
+
+        .msg {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+
+        .ppt-node-Tokoh { fill: #e74c3c !important; }
+        .ppt-node-Partai { fill: #f39c12 !important; }
+        .ppt-node-Jabatan { fill: #9b59b6 !important; }
+        .ppt-node-Wilayah { fill: #27ae60 !important; }
+        .ppt-node-Universitas { fill: #3498db !important; }
+
+        @media (max-width: 768px) {
+            .container { flex-direction: column; padding: 10px; }
+            .header { padding: 15px; }
+            .header h1 { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🏛️ Tokoh Politik</h1>
+        <div class="search-container">
+            <input type="text" id="search" class="search-input" placeholder="Cari nama tokoh...">
+            <button id="btn" class="search-btn">🔍</button>
+            <div id="auto" class="autocomplete"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="graph-area">
+            <div id="popoto-graph" class="ppt-div-graph"></div>
+        </div>
+        <div class="info-panel">
+            <h3 style="margin-bottom: 15px;">📊 Info Tokoh</h3>
+            <div id="info">
+                <div class="msg">Cari tokoh untuk melihat detail</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/neo4j-driver-lite/lib/browser/neo4j-lite-web.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popoto/dist/popoto.min.js"></script>
+    
+    <script>
+        const driver = neo4j.driver("bolt://localhost:7687", neo4j.auth.basic("neo4j", "12345678"));
+        popoto.runner.DRIVER = driver;
+        
+        // Konfigurasi provider untuk semua node types
+        popoto.provider.node.Provider = {
+            "Tokoh": { 
+                "returnAttributes": ["nama", "tahun_lahir", "mulai_menjabat", "catatan_karier", "id", "negara"], 
+                "constraintAttribute": "nama", 
+                "displayAttribute": "nama" 
+            },
+            "Partai": { 
+                "returnAttributes": ["nama"], 
+                "constraintAttribute": "nama", 
+                "displayAttribute": "nama" 
+            },
+            "Jabatan": { 
+                "returnAttributes": ["nama"], 
+                "constraintAttribute": "nama", 
+                "displayAttribute": "nama" 
+            },
+            "Universitas": { 
+                "returnAttributes": ["nama"], 
+                "constraintAttribute": "nama", 
+                "displayAttribute": "nama" 
+            },
+            "Wilayah": { 
+                "returnAttributes": ["nama"], 
+                "constraintAttribute": "nama", 
+                "displayAttribute": "nama" 
+            }
+        };
+        
+        let tokohList = [];
+        const search = document.getElementById('search');
+        const auto = document.getElementById('auto');
+        const info = document.getElementById('info');
+
+        function loadTokoh() {
+            const session = driver.session();
+            session.run("MATCH (t:Tokoh) RETURN t.nama ORDER BY t.nama LIMIT 50")
+                .then(result => {
+                    tokohList = result.records.map(r => r.get('t.nama')).filter(nama => nama);
+                    console.log('Loaded tokoh:', tokohList.length);
+                })
+                .catch(error => console.error('Error loading tokoh:', error))
+                .finally(() => session.close());
+        }
+
+        function showAuto(query) {
+            if (!query || query.length < 2) {
+                auto.style.display = 'none';
+                return;
+            }
+            const matches = tokohList.filter(n => n && n.toLowerCase().includes(query.toLowerCase())).slice(0, 5);
+            if (matches.length === 0) {
+                auto.style.display = 'none';
+                return;
+            }
+            auto.innerHTML = matches.map(n => `<div class="autocomplete-item" onclick="select('${n.replace(/'/g, "\\'")}')">${n}</div>`).join('');
+            auto.style.display = 'block';
+        }
+
+        function select(nama) {
+            search.value = nama;
+            auto.style.display = 'none';
+            cariTokoh(nama);
+        }
+
+        function cariTokoh(nama) {
+            info.innerHTML = '<div class="msg">⏳ Loading...</div>';
+            const session = driver.session();
+            session.run(`
+                MATCH (t:Tokoh {nama: $nama})
+                OPTIONAL MATCH (t)-[r]-(x)
+                WHERE x:Partai OR x:Jabatan OR x:Universitas OR x:Wilayah
+                RETURN t, collect(DISTINCT {
+                    type: type(r), 
+                    target: x.nama, 
+                    label: labels(x)[0],
+                    direction: CASE 
+                        WHEN startNode(r) = t THEN 'out' 
+                        ELSE 'in' 
+                    END
+                }) as rel
+            `, { nama })
+            .then(result => {
+                if (result.records.length > 0) {
+                    const tokoh = result.records[0].get('t').properties;
+                    const rel = result.records[0].get('rel').filter(r => r.target);
+                    tampilInfo(tokoh, rel);
+                } else {
+                    info.innerHTML = '<div class="msg">❌ Tidak ditemukan</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                info.innerHTML = '<div class="msg">❌ Error dalam pencarian</div>';
+            })
+            .finally(() => session.close());
+        }
+
+        function tampilInfo(tokoh, rel) {
+            // Format atribut dengan label yang lebih baik
+            const attrLabels = {
+                'nama': 'Nama',
+                'tahun_lahir': 'Tahun Lahir',
+                'mulai_menjabat': 'Mulai Menjabat',
+                'catatan_karier': 'Catatan Karier',
+                'id': 'ID',
+                'negara': 'Negara'
+            };
+            
+            const attrs = Object.entries(tokoh)
+                .filter(([k, v]) => v !== null && v !== undefined && v !== '')
+                .map(([k, v]) => {
+                    const label = attrLabels[k] || k;
+                    return `<div class="attr"><b>${label}</b><span>${v}</span></div>`;
+                }).join('');
+            
+            const rels = rel.map(r => {
+                const emoji = {
+                    'Partai': '🏛️',
+                    'Jabatan': '💼',
+                    'Universitas': '🎓',
+                    'Wilayah': '🏢'
+                }[r.label] || '🔗';
+                
+                return `<div class="relation" onclick="exploreNode('${r.target.replace(/'/g, "\\'")}', '${r.label}')">
+                    ${emoji} <b>${r.target}</b> <small>(${r.label})</small>
+                </div>`;
+            }).join('');
+            
+            info.innerHTML = `
+                <div class="info-card">
+                    <div class="name">${tokoh.nama}</div>
+                    ${attrs}
+                </div>
+                ${rel.length > 0 ? 
+                    `<h4 style="margin: 10px 0;">🔗 Relasi (${rel.length})</h4>${rels}` : 
+                    '<div class="msg">Tidak ada relasi ditemukan</div>'
+                }
+            `;
+        }
+
+        function exploreNode(nama, nodeType) {
+            if (nodeType === 'Tokoh') {
+                cariTokoh(nama);
+            } else {
+                // Untuk node non-Tokoh, tampilkan info singkat
+                info.innerHTML = '<div class="msg">⏳ Loading...</div>';
+                const session = driver.session();
+                session.run(`
+                    MATCH (n:${nodeType} {nama: $nama})
+                    OPTIONAL MATCH (n)-[r]-(t:Tokoh)
+                    RETURN n, collect(DISTINCT t.nama) as tokoh_terkait
+                `, { nama })
+                .then(result => {
+                    if (result.records.length > 0) {
+                        const node = result.records[0].get('n').properties;
+                        const tokohTerkait = result.records[0].get('tokoh_terkait').filter(t => t);
+                        
+                        const tokohLinks = tokohTerkait.map(t => 
+                            `<div class="relation" onclick="cariTokoh('${t.replace(/'/g, "\\'")}')">${t}</div>`
+                        ).join('');
+                        
+                        info.innerHTML = `
+                            <div class="info-card">
+                                <div class="name">${node.nama} (${nodeType})</div>
+                            </div>
+                            ${tokohTerkait.length > 0 ? 
+                                `<h4 style="margin: 10px 0;">👥 Tokoh Terkait (${tokohTerkait.length})</h4>${tokohLinks}` : 
+                                '<div class="msg">Tidak ada tokoh terkait</div>'
+                            }
+                        `;
+                    }
+                })
+                .finally(() => session.close());
+            }
+        }
+
+        // Event listeners
+        search.addEventListener('input', e => showAuto(e.target.value));
+        search.addEventListener('keydown', e => { 
+            if (e.key === 'Enter') {
+                document.getElementById('btn').click();
+            }
+        });
+        
+        document.getElementById('btn').addEventListener('click', () => {
+            const nama = search.value.trim();
+            if (nama) {
+                cariTokoh(nama);
+                auto.style.display = 'none';
+            }
+        });
+        
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.search-container')) {
+                auto.style.display = 'none';
+            }
+        });
+
+        // Initialize application
+        driver.verifyConnectivity()
+            .then(() => { 
+                console.log('Database connected successfully');
+                popoto.start("Tokoh"); 
+                loadTokoh(); 
+            })
+            .catch(error => {
+                console.error('Database connection failed:', error);
+                info.innerHTML = '<div class="msg">❌ Gagal menghubungkan ke database Neo4j</div>';
+            });
+    </script>
+</body>
+</html>
